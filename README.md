@@ -27,10 +27,15 @@ Light-client(work in progress):
 
 
 ## Compile & Run
-<pre><code>git clone https://github.com/milansuk/tin
-go get github.com/gorilla/websocket
+Libraries
+<pre><code>go get github.com/gorilla/websocket
 go get github.com/mattn/go-sqlite3
 go get github.com/herumi/bls-eth-go-binary
+</code></pre>
+
+Tin
+<pre><code>git clone https://github.com/milansuk/tin
+cd tin
 go build
 ./tin
 </code></pre>
