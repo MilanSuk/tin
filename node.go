@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -71,7 +72,7 @@ func (stat *NodeStat) Print(ledger *Ledger) {
 }
 
 type Node struct {
-	net    *Net
+	net    *Server
 	ledger *Ledger
 
 	blockRaw BlockRaw
@@ -86,7 +87,7 @@ type Node struct {
 	thread OsThread
 }
 
-func NewNode(dbPath string, NUMBER_TXNS_IN_BLOCK int, genesis_amount int64, genesis_pubKey *BLSPubKey, blocksPath string) (*Node, error) {
+func NewNode(ssl_on bool, port int, dbPath string, NUMBER_TXNS_IN_BLOCK int, genesis_amount int64, genesis_pubKey *BLSPubKey, blocksPath string) (*Node, error) {
 	var node Node
 	var err error
 
@@ -95,7 +96,7 @@ func NewNode(dbPath string, NUMBER_TXNS_IN_BLOCK int, genesis_amount int64, gene
 		return nil, fmt.Errorf("NewNode() NewLedger failed: %w", err)
 	}
 
-	node.net, err = NewNet()
+	node.net, err = NewNet(ssl_on, port)
 	if err != nil {
 		return nil, fmt.Errorf("NewNode() NewNet failed: %w", err)
 	}
@@ -133,13 +134,15 @@ func (node *Node) Destroy() {
 
 	err := node.net.Destroy()
 	if err != nil {
-		fmt.Printf("Node.Destroy() failed: %v", err)
+		log.Printf("Node.Destroy() failed: %v", err)
 	}
 	node.ledger.Destroy()
 
-	err = node.blocksFile.Close()
-	if err != nil {
-		fmt.Printf("Node.Close() failed: %v", err)
+	if node.blocksFile != nil {
+		err = node.blocksFile.Close()
+		if err != nil {
+			log.Printf("Node.Close() failed: %v", err)
+		}
 	}
 }
 
@@ -234,12 +237,12 @@ func (node *Node) Loop() {
 	for node.thread.Is() {
 		err := node.CreateBlock()
 		if err != nil {
-			fmt.Printf("Loop() CreateBlock() failed: %v\n", err)
+			log.Printf("Loop() CreateBlock() failed: %v\n", err)
 		}
 
 		err = node.VerifyBlock()
 		if err != nil {
-			fmt.Printf("Loop() VerifyBlock() failed: %v\n", err)
+			log.Printf("Loop() VerifyBlock() failed: %v\n", err)
 		}
 	}
 }
