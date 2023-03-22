@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 
@@ -212,7 +213,7 @@ func Client_generateTxnsFile(NUMBER_TXNS int, genesis_amount int64, genesis_priv
 	return nil
 }
 
-func Client_sendTxns(node *Node, txnsPath string) (int, error) {
+func Client_sendTxns(cons *Connections, txnsPath string) (int, error) {
 
 	data, err := os.ReadFile(txnsPath)
 	if err != nil {
@@ -225,7 +226,11 @@ func Client_sendTxns(node *Node, txnsPath string) (int, error) {
 		bytes := int(binary.LittleEndian.Uint64(data[pos : pos+8]))
 		pos += 8
 
-		node.net.txnsPool.Add(data[pos : pos+bytes])
+		//node.net.txnsPool.Add(data[pos : pos+bytes])
+		err := cons.SendTxn(data[pos : pos+bytes])
+		if err != nil {
+			log.Printf("Client_sendTxns() failed: %v\n", err)
+		}
 		pos += bytes
 
 		num_added++
@@ -235,7 +240,7 @@ func Client_sendTxns(node *Node, txnsPath string) (int, error) {
 	return num_added, nil
 }
 
-func Client_sendBlocks(node *Node, blocksPath string) (int, error) {
+func Client_sendBlocks(cons *Connections, blocksPath string) (int, error) {
 
 	data, err := os.ReadFile(blocksPath)
 	if err != nil {
@@ -248,7 +253,11 @@ func Client_sendBlocks(node *Node, blocksPath string) (int, error) {
 		bytes := int(binary.LittleEndian.Uint64(data[pos : pos+8]))
 		pos += 8
 
-		node.net.blocksPool.Add(data[pos : pos+bytes])
+		//node.net.blocksPool.Add(data[pos : pos+bytes])
+		err := cons.SendBlock(data[pos : pos+bytes])
+		if err != nil {
+			fmt.Printf("Client_sendTxns() failed: %v\n", err)
+		}
 		pos += bytes
 
 		num_added++
