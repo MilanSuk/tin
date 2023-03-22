@@ -77,7 +77,7 @@ func (net *Server) Loop(ssl_on bool, port int) error {
 
 			c, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				log.Println("Error: RunHub() failed: %v", err)
+				log.Printf("Error: RunHub() failed: %v\n", err)
 				return
 			}
 			defer c.Close()
@@ -91,17 +91,17 @@ func (net *Server) Loop(ssl_on bool, port int) error {
 				}
 
 				if err != nil {
-					log.Println("Error: ReadMessage() failed: %v", err)
+					log.Printf("Error: ReadMessage() failed: %v\n", err)
 					return
 				}
 
 				if mt != websocket.BinaryMessage {
-					log.Println("Error: ReadMessage() is not binary: %v", err)
+					log.Printf("Error: ReadMessage() is not binary: %v\n", err)
 					return
 				}
 
 				if len(message) < 2 {
-					log.Printf("Error: ReadMessage() is too small: %v", err)
+					log.Printf("Error: ReadMessage() is too small: %v\n", err)
 					return
 				}
 

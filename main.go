@@ -30,22 +30,21 @@ func main() {
 
 	//file paths
 	os.Mkdir("data", os.ModePerm)
-
 	dbPathA := "data/dbA.sqlite"
 	dbPathB := "data/dbB.sqlite"
 	genesisPath := "data/genesis.bin"
 	txnsPath := "data/txns.bin"
 	blocksPath := "data/blocks.bin"
 
-	const NUMBER_TXNS = 4000
-	const NUMBER_TXNS_IN_BLOCK = 1000
+	const NUMBER_TXNS = 40000
+	const NUMBER_TXNS_IN_BLOCK = 10000
 
 	// inits Db
 	var genesis_amount int64
 	var genesis_privKey BLSPrivKey
 	err := Client_getOrGenerateGenesis(genesisPath, &genesis_amount, &genesis_privKey)
 	if err != nil {
-		log.Printf("Client_getOrGenerateGenesis() failed: %v", err)
+		log.Printf("Client_getOrGenerateGenesis() failed: %v\n", err)
 		return
 	}
 	var genesis_pubKey BLSPubKey
@@ -56,7 +55,7 @@ func main() {
 		if !OsFileExists(txnsPath) {
 			err = Client_generateTxnsFile(NUMBER_TXNS, genesis_amount, &genesis_privKey, txnsPath)
 			if err != nil {
-				log.Printf("Client_generateTxnsFile() failed: %v", err)
+				log.Printf("Client_generateTxnsFile() failed: %v\n", err)
 				return
 			}
 		}
@@ -83,7 +82,7 @@ func main() {
 
 		n, err := Client_sendTxns(conns, txnsPath)
 		if err != nil {
-			log.Printf("Client_sendTxns() failed: %v", err)
+			log.Printf("Client_sendTxns() failed: %v\n", err)
 			return
 		}
 
@@ -113,7 +112,7 @@ func main() {
 
 		n, err := Client_sendBlocks(conns, blocksPath)
 		if err != nil {
-			log.Printf("Client_sendBlocks() failed: %v", err)
+			log.Printf("Client_sendBlocks() failed: %v\n", err)
 			return
 		}
 

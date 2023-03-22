@@ -134,14 +134,14 @@ func (node *Node) Destroy() {
 
 	err := node.net.Destroy()
 	if err != nil {
-		log.Printf("Node.Destroy() failed: %v", err)
+		log.Printf("Node.Destroy() failed: %v\n", err)
 	}
 	node.ledger.Destroy()
 
 	if node.blocksFile != nil {
 		err = node.blocksFile.Close()
 		if err != nil {
-			log.Printf("Node.Close() failed: %v", err)
+			log.Printf("Node.Close() failed: %v\n", err)
 		}
 	}
 }
