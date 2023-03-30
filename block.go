@@ -122,7 +122,7 @@ func _BlockRaw_AddTxnIntoAccount(txn *TxnRaw, ledger *Ledger) (*Account, error) 
 func (block *BlockRaw) AddTxn(txnBuff *TBuffer, max_block_size int, blockBuff *TBuffer, ledger *Ledger) (bool, error) {
 
 	var txn TxnRaw
-	msg, sign, err := txn.InitTxnFromBuffer(txnBuff, true)
+	msg, pubKey, sign, err := txn.InitTxnFromBuffer(txnBuff, true, true)
 	if err != nil {
 		return false, fmt.Errorf("AddTxn().InitTxnFromBuffer() failed: %w", err)
 	}
@@ -142,13 +142,8 @@ func (block *BlockRaw) AddTxn(txnBuff *TBuffer, max_block_size int, blockBuff *T
 		return false, fmt.Errorf("AddTxn() src export pubKey failed: %w", err)
 	}
 
-	h, err := TBuffer_sha256(msg)
-	if err != nil {
-		return false, fmt.Errorf("AddTxn() sha256() failed: %w", err)
-	}
-
-	if !sign.VerifyByte(&pk, h) { // SLOW
-		return false, errors.New("AddTxn() Signiture is invalid")
+	if !pk.IsEqual(pubKey) {
+		return false, errors.New("AddTxn() PubKeys not match")
 	}
 
 	_, err = _BlockRaw_AddTxnIntoAccount(&txn, ledger)
@@ -211,7 +206,7 @@ func (block *BlockRaw) CheckAndWrite(blockBuff *TBuffer, ledger *Ledger) error {
 	var absError error
 	for blockBuff.pos < blockBuff.size {
 		var txn TxnRaw
-		msg, _, err := txn.InitTxnFromBuffer(blockBuff, false)
+		msg, _, _, err := txn.InitTxnFromBuffer(blockBuff, false, false)
 		if err != nil {
 			absError = fmt.Errorf("CheckAndWrite() InitTxnFromBuffer() failed: %w", err)
 			break

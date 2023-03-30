@@ -19,6 +19,8 @@ package main
 import (
 	"log"
 	"os"
+	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -33,11 +35,11 @@ func main() {
 	dbPathA := "data/dbA.sqlite"
 	dbPathB := "data/dbB.sqlite"
 	genesisPath := "data/genesis.bin"
-	txnsPath := "data/txns.bin"
+	txnsPath := "data/txns_"
 	blocksPath := "data/blocks.bin"
 
-	const NUMBER_TXNS = 40000
-	const NUMBER_TXNS_IN_BLOCK = 10000
+	const NUMBER_TXNS = 4000
+	const NUMBER_TXNS_IN_BLOCK = 1000
 
 	// inits Db
 	var genesis_amount int64
@@ -52,8 +54,8 @@ func main() {
 
 	// generates txns into write them into file
 	{
-		if !OsFileExists(txnsPath) {
-			err = Client_generateTxnsFile(NUMBER_TXNS, genesis_amount, &genesis_privKey, txnsPath)
+		if !OsFileExists(txnsPath + "0") {
+			err = Client_generateTxnsFile(NUMBER_TXNS, NUMBER_TXNS_IN_BLOCK, genesis_amount, &genesis_privKey, txnsPath)
 			if err != nil {
 				log.Printf("Client_generateTxnsFile() failed: %v\n", err)
 				return
@@ -72,25 +74,43 @@ func main() {
 			return
 		}
 
-		time.Sleep(1000 * time.Millisecond)
-		conns := NewConnections()
-		err = conns.Add("localhost", PORT, "data", false)
-		if err != nil {
-			log.Printf("onnections.Add() failed: %v\n", err)
-			return
+		time.Sleep(100 * time.Millisecond)
+		var conns []*Connections
+		for i := 0; i < runtime.NumCPU(); i++ {
+			conns = append(conns, NewConnections())
+			err = conns[i].Add("localhost", PORT, "data", false)
+			if err != nil {
+				log.Printf("onnections.Add() failed: %v\n", err)
+				return
+			}
 		}
 
-		n, err := Client_sendTxns(conns, txnsPath)
+		n, err := Client_sendTxns(conns[0], txnsPath+"0")
 		if err != nil {
 			log.Printf("Client_sendTxns() failed: %v\n", err)
 			return
 		}
-
-		for node.stat.sum_txns < n {
+		nn := n
+		for node.stat.sum_txns < nn {
 			time.Sleep(1 * time.Millisecond)
 		}
 
-		conns.Destroy()
+		for bi := 0; bi < (NUMBER_TXNS/NUMBER_TXNS_IN_BLOCK)-1; bi++ {
+			time.Sleep(1 * time.Second) //? ...
+			n, err := Client_sendTxnsMT(conns, txnsPath+strconv.Itoa(bi+1))
+			if err != nil {
+				log.Printf("Client_sendTxns() failed: %v\n", err)
+				return
+			}
+			nn += n
+			for node.stat.sum_txns < nn {
+				time.Sleep(1 * time.Millisecond)
+			}
+		}
+
+		for _, c := range conns {
+			c.Destroy()
+		}
 		node.Destroy()
 	}
 

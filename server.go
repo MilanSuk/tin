@@ -26,13 +26,11 @@ import (
 )
 
 type Server struct {
-	txnsPool   *Pool
-	blocksPool *Pool
+	txnsPool   *PoolTxns
+	blocksPool *PoolBlocks
 
 	server         http.Server
 	isServerClosed bool
-
-	//thread OsThread
 }
 
 var upgrader = websocket.Upgrader{
@@ -43,8 +41,8 @@ var upgrader = websocket.Upgrader{
 func NewNet(ssl_on bool, port int) (*Server, error) {
 	var net Server
 
-	net.txnsPool = NewPool()
-	net.blocksPool = NewPool()
+	net.txnsPool = NewPoolTxns()
+	net.blocksPool = NewPoolBlocks()
 
 	go net.Loop(ssl_on, port)
 
@@ -52,9 +50,9 @@ func NewNet(ssl_on bool, port int) (*Server, error) {
 }
 
 func (net *Server) Destroy() error {
+
 	net.isServerClosed = true
 	net.server.Close()
-	//net.thread.Wait()
 	return nil
 }
 
@@ -62,8 +60,6 @@ const MSG_TXN = 0
 const MSG_BLOCK = 1
 
 func (net *Server) Loop(ssl_on bool, port int) error {
-
-	//defer net.thread.End()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +103,27 @@ func (net *Server) Loop(ssl_on bool, port int) error {
 
 				//var ans []byte
 				if message[0] == MSG_TXN {
-					net.txnsPool.Add(message[1:])
+					message = message[1:]
+
+					var txn TxnRaw
+					msg, pubKey, sign, err := txn.InitTxnFromBuffer(NewTBuffer(message), true, true)
+					if err != nil {
+						log.Printf("Error: InitTxnFromBuffer() failed: %v", err)
+						return
+					}
+					h, err := TBuffer_sha256(msg)
+					if err != nil {
+						log.Printf("Error: sha256() failed: %v", err)
+						return
+					}
+
+					if !sign.VerifyByte(pubKey, h) { //SLOW ...
+						log.Printf("Error: Signiture is invalid")
+						return
+					}
+
+					net.txnsPool.Add(message) //including pubKey
+
 				} else if message[0] == MSG_BLOCK {
 					net.blocksPool.Add(message[1:])
 				}

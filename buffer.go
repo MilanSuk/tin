@@ -29,7 +29,7 @@ type TBuffer struct {
 	pos  int64
 }
 
-func TNewBuffer(src []byte) *TBuffer {
+func NewTBuffer(src []byte) *TBuffer {
 	var buff TBuffer
 
 	if src == nil {
@@ -66,9 +66,9 @@ func TBuffer_sha256(data []byte) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func (buff *TBuffer) sha256() ([]byte, error) {
+func (buff *TBuffer) sha256(start int) ([]byte, error) {
 
-	return TBuffer_sha256(buff.data[:buff.size])
+	return TBuffer_sha256(buff.data[start:buff.size])
 }
 
 func (buff *TBuffer) Resize(bytes int64) {
@@ -86,41 +86,6 @@ func (buff *TBuffer) WriteUint8(value byte) {
 	buff.size++
 }
 
-/*
-func (buff *TBuffer) WriteInt(value int64) {
-
-		buff.Resize(buff.size + 8)
-		binary.LittleEndian.PutUint64(buff.data[buff.size:], uint64(value))
-		buff.size += 8
-	}
-
-func (buff *TBuffer) WriteFloat(value float64) {
-
-		buff.Resize(buff.size + 8)
-		binary.LittleEndian.PutUint64(buff.data[buff.size:], math.Float64bits(value))
-		buff.size += 8
-	}
-
-func (buff *TBuffer) WriteString(value string) {
-
-		len := int64(len(value))
-		buff.WriteInt(len)
-
-		buff.Resize(buff.size + len)
-		copy(buff.data[buff.size:], value)
-		buff.size += len
-	}
-
-func (buff *TBuffer) WriteBlob(value []byte) {
-
-		len := int64(len(value))
-		buff.WriteInt(len)
-
-		buff.Resize(buff.size + len)
-		copy(buff.data[buff.size:], value)
-		buff.size += len
-	}
-*/
 func (buff *TBuffer) WriteSBlob(value []byte) {
 
 	len := int64(len(value))
@@ -161,59 +126,6 @@ func (buff *TBuffer) ReadNumber() (int64, error) {
 	return int64(binary.LittleEndian.Uint64(t[:])), nil
 }
 
-/*func (buff *TBuffer) ReadInt() (int64, error) {
-
-	if buff.pos+8 <= buff.size {
-		value := int64(binary.LittleEndian.Uint64(buff.data[buff.pos:]))
-		buff.pos += 8
-		return value, nil
-	}
-
-	return 0, errors.New("ReadInt() is is of buffer")
-}
-func (buff *TBuffer) ReadFloat() (float64, error) {
-
-	if buff.pos+8 <= buff.size {
-		value := math.Float64frombits(binary.LittleEndian.Uint64(buff.data[buff.pos:]))
-		buff.pos += 8
-		return value, nil
-	}
-
-	return 0, errors.New("ReadFloat() is is of buffer")
-}
-
-func (buff *TBuffer) ReadString() (string, error) {
-
-	len, err := buff.ReadInt()
-	if err != nil {
-		return "", err
-	}
-
-	if buff.pos+len <= buff.size {
-		value := string(buff.data[buff.pos : buff.pos+len])
-		buff.pos += len
-		return value, nil
-	}
-
-	return "", errors.New("ReadString() is is of buffer")
-}
-
-func (buff *TBuffer) ReadBlob() ([]byte, error) {
-
-	len, err := buff.ReadInt()
-	if err != nil {
-		return nil, err
-	}
-
-	if buff.pos+len <= buff.size {
-		value := buff.data[buff.pos : buff.pos+len]
-		buff.pos += len
-		return value, nil
-	}
-
-	return nil, errors.New("ReadBlob() is is of buffer")
-}*/
-
 func (buff *TBuffer) ReadSBlob(data []byte, len int64) error {
 
 	if buff.pos+len <= buff.size {
@@ -225,7 +137,7 @@ func (buff *TBuffer) ReadSBlob(data []byte, len int64) error {
 	return errors.New("ReadSBlob() is is of buffer")
 }
 
-func (buff *TBuffer) writeNumber(value int64) {
+func (buff *TBuffer) WriteNumber(value int64) {
 
 	var t [8]byte
 	binary.LittleEndian.PutUint64(t[:], uint64(value))

@@ -8,7 +8,7 @@ Tin source code is written from scratch. It's not based on any other blockchain.
 ## Research
 High transaction throughput:
 - Bitcoin can process 3-7 txns/sec. It has a 1MB block every ~10 minutes
-- Tin can do 100 txns/sec, with the same 1MB every 10 minutes as Bitcoin
+- Tin can do 30-100 txns/sec, with the same 1MB every 10 minutes as Bitcoin
 - Higher throughput => lower fees for senders or higher income for miners
 
 Light-client(work in progress):
@@ -18,9 +18,9 @@ Light-client(work in progress):
 
 
 ## Performance
-- 51 sec to generate 40K txns
-- 35 sec to create a block with 10K txns(~0.17MB). A full 1MB block can hold ~58K txns
-- 5 sec to check block(10K txns)
+- user : 51 sec to generate 40K txns
+- miner: 12 sec to create a block with 10K txns(~0.15MB). A full 1MB block can hold ~60K txns
+- miner: 5 sec to check block(10K txns)
 
 1MB block(60K txns) mined every 10 minutes = 100 txns/sec
 

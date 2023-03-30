@@ -21,25 +21,25 @@ import (
 	"sync"
 )
 
-type Pool struct {
+type PoolBlocks struct {
 	lock sync.Mutex
 
 	items [][]byte
 }
 
-func NewPool() *Pool {
-	var self Pool
+func NewPoolBlocks() *PoolBlocks {
+	var self PoolBlocks
 	return &self
 }
 
-func (pool *Pool) Num() int {
+func (pool *PoolBlocks) Num() int {
 
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 	return len(pool.items)
 }
 
-func (pool *Pool) Add(item []byte) {
+func (pool *PoolBlocks) Add(item []byte) {
 
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
@@ -47,13 +47,53 @@ func (pool *Pool) Add(item []byte) {
 	pool.items = append(pool.items, item)
 }
 
-func (pool *Pool) Get() ([]byte, error) {
+func (pool *PoolBlocks) Get() ([]byte, error) {
 
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 
 	if len(pool.items) == 0 {
-		return nil, errors.New("Pool is empty")
+		return nil, errors.New("PoolBlocks is empty")
+	}
+
+	ret := pool.items[0]
+	pool.items = pool.items[1:] //remove
+	return ret, nil
+}
+
+type PoolTxns struct {
+	lock sync.Mutex
+
+	items [][]byte
+}
+
+func NewPoolTxns() *PoolTxns {
+	var self PoolTxns
+	return &self
+}
+
+func (pool *PoolTxns) Num() int {
+
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+	return len(pool.items)
+}
+
+func (pool *PoolTxns) Add(item []byte) {
+
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
+	pool.items = append(pool.items, item)
+}
+
+func (pool *PoolTxns) Get() ([]byte, error) {
+
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
+	if len(pool.items) == 0 {
+		return nil, errors.New("PoolTxns is empty")
 	}
 
 	ret := pool.items[0]

@@ -22,6 +22,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
@@ -130,15 +131,7 @@ func Client_getOrGenerateGenesis(genesisPath string, amount *int64, privKey *BLS
 	return nil
 }
 
-func Client_generateTxnsFile(NUMBER_TXNS int, genesis_amount int64, genesis_privKey *BLSPrivKey, txnsPath string) error {
-	//  void Client_generateTxnsFile(const UBIG NUMBER_TXNS, const UBIG genesis_amount, BLSPrivKey *genesis_privKey, const OsText txnsPath)
-
-	f, err := os.Create(txnsPath)
-	if err != nil {
-		return fmt.Errorf("Client_generateTxnsFile() Create() failed: %w", err)
-	}
-	defer f.Close()
-
+func Client_generateTxnsFile(NUMBER_TXNS int, NUMBER_TXNS_IN_BLOCK int, genesis_amount int64, genesis_privKey *BLSPrivKey, txnsPath string) error {
 	// adds genesis
 	genesis, err := NewClientAccount(genesis_privKey)
 	if err != nil {
@@ -149,45 +142,34 @@ func Client_generateTxnsFile(NUMBER_TXNS int, genesis_amount int64, genesis_priv
 	accounts = append(accounts, genesis)
 	genesis.amount = genesis_amount
 
-	// generates txns
 	var txnBuff TBuffer
+
+	//1st block is split
 	st := OsTime()
-	for i := 0; i < NUMBER_TXNS; i++ {
-
+	f, err := os.Create(txnsPath + "0")
+	if err != nil {
+		return fmt.Errorf("Client_generateTxnsFile() Create() failed: %w", err)
+	}
+	nt := 0
+	for i := 0; i < NUMBER_TXNS_IN_BLOCK; i++ {
 		var txn TxnRaw
-		var src, dst *ClientAccount
-		var amount int64
-		if i%20 == 0 {
-			amount = 1000
+		const amount = 1000
 
-			// new account(from genesisAccount . newOne)
-			src_i := 0
-			//dst_i := len(accounts)
+		src_i := 0
 
-			src = accounts[src_i]
-			dst, err = NewClientAccount(nil)
-			if err != nil {
-				return fmt.Errorf("Client_generateTxnsFile() NewClientAccount() failed: %w", err)
-			}
-			accounts = append(accounts, dst)
-
-			txn.InitTxnRawLong(int64(src_i), src.nonce, amount, 0, &dst.pubKey)
-		} else {
-			amount = 1
-			src_i := _Client_GetRandomAccount(accounts, amount)
-			dst_i := _Client_GetRandomAccount(accounts, 0)
-
-			src = accounts[src_i]
-			dst = accounts[dst_i]
-
-			txn.InitTxnRawShort(int64(src_i), src.nonce, amount, 0, int64(dst_i))
+		src := accounts[src_i]
+		dst, err := NewClientAccount(nil)
+		if err != nil {
+			return fmt.Errorf("Client_generateTxnsFile() NewClientAccount() failed: %w", err)
 		}
+		accounts = append(accounts, dst)
+		txn.InitTxnRawLong(int64(src_i), src.nonce, amount, 0, &dst.pubKey)
 
 		src.amount -= amount
 		dst.amount += amount
 		src.nonce++
 
-		err := txn.ExportBuffer(&src.key, &txnBuff)
+		err = txn.ExportBuffer(&src.pubKey, &src.key, &txnBuff)
 		if err != nil {
 			return fmt.Errorf("Client_generateTxnsFile() ExportBuffer() failed: %w", err)
 		}
@@ -200,13 +182,112 @@ func Client_generateTxnsFile(NUMBER_TXNS int, genesis_amount int64, genesis_priv
 		if err != nil {
 			return fmt.Errorf("Client_generateTxnsFile() Write() failed: %w", err)
 		}
-
-		if i%500 == 0 {
-			prc := float64(i) / float64(NUMBER_TXNS)
-			dt := OsTime() - st
-			fmt.Printf("%.1f%% remaining time %.1fmin\n", prc*100, ((dt/prc)-dt)/60)
-		}
+		nt++
 	}
+	f.Close()
+
+	//other blocks
+	for bi := 0; bi < (NUMBER_TXNS/NUMBER_TXNS_IN_BLOCK)-1; bi++ {
+
+		f, err := os.Create(txnsPath + strconv.Itoa(bi+1))
+		if err != nil {
+			return fmt.Errorf("Client_generateTxnsFile() Create() failed: %w", err)
+		}
+
+		for i := 0; i < NUMBER_TXNS_IN_BLOCK; i++ {
+			var txn TxnRaw
+			const amount = 1
+			src_i := i + 1
+			dst_i := 0
+			src := accounts[src_i]
+			dst := accounts[dst_i]
+
+			txn.InitTxnRawShort(int64(src_i), src.nonce, amount, 0, int64(dst_i))
+
+			src.amount -= amount
+			dst.amount += amount
+			src.nonce++
+
+			err := txn.ExportBuffer(&src.pubKey, &src.key, &txnBuff)
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() ExportBuffer() failed: %w", err)
+			}
+
+			err = Client_WriteInt(f, int64(txnBuff.size))
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() Client_WriteInt() failed: %w", err)
+			}
+			_, err = f.Write(txnBuff.data[:txnBuff.size])
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() Write() failed: %w", err)
+			}
+			nt++
+		}
+		f.Close()
+
+		prc := float64(nt) / float64(NUMBER_TXNS)
+		dt := OsTime() - st
+		fmt.Printf("%.1f%% remaining time %.1fmin\n", prc*100, ((dt/prc)-dt)/60)
+	}
+
+	// generates txns
+	/*
+		st := OsTime()
+		for i := 0; i < NUMBER_TXNS; i++ {
+
+			var txn TxnRaw
+			var src, dst *ClientAccount
+			var amount int64
+			if i < 200 || i%20 == 0 {
+				amount = 1000
+
+				// new account(from genesisAccount . newOne)
+				src_i := 0
+				//dst_i := len(accounts)
+
+				src = accounts[src_i]
+				dst, err = NewClientAccount(nil)
+				if err != nil {
+					return fmt.Errorf("Client_generateTxnsFile() NewClientAccount() failed: %w", err)
+				}
+				accounts = append(accounts, dst)
+
+				txn.InitTxnRawLong(int64(src_i), src.nonce, amount, 0, &dst.pubKey)
+			} else {
+				amount = 1
+				src_i := _Client_GetRandomAccount(accounts, amount)
+				dst_i := _Client_GetRandomAccount(accounts, 0)
+
+				src = accounts[src_i]
+				dst = accounts[dst_i]
+
+				txn.InitTxnRawShort(int64(src_i), src.nonce, amount, 0, int64(dst_i))
+			}
+
+			src.amount -= amount
+			dst.amount += amount
+			src.nonce++
+
+			err := txn.ExportBuffer(&src.pubKey, &src.key, &txnBuff)
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() ExportBuffer() failed: %w", err)
+			}
+
+			err = Client_WriteInt(f, int64(txnBuff.size))
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() Client_WriteInt() failed: %w", err)
+			}
+			_, err = f.Write(txnBuff.data[:txnBuff.size])
+			if err != nil {
+				return fmt.Errorf("Client_generateTxnsFile() Write() failed: %w", err)
+			}
+
+			if i%500 == 0 {
+				prc := float64(i) / float64(NUMBER_TXNS)
+				dt := OsTime() - st
+				fmt.Printf("%.1f%% remaining time %.1fmin\n", prc*100, ((dt/prc)-dt)/60)
+			}
+		}*/
 
 	fmt.Printf("\nDone in time(%.1fsec). Txns(%d) generated into file(%s). Number of accounts(%d)\n", OsTime()-st, NUMBER_TXNS, txnsPath, len(accounts))
 
@@ -215,12 +296,13 @@ func Client_generateTxnsFile(NUMBER_TXNS int, genesis_amount int64, genesis_priv
 
 func Client_sendTxns(cons *Connections, txnsPath string) (int, error) {
 
+	var num_added = 0
+
 	data, err := os.ReadFile(txnsPath)
 	if err != nil {
 		return -1, fmt.Errorf("Client_sendTxns() ReadFile() failed: %w", err)
 	}
 
-	var num_added = 0
 	pos := 0
 	for pos < len(data) {
 		bytes := int(binary.LittleEndian.Uint64(data[pos : pos+8]))
@@ -234,6 +316,37 @@ func Client_sendTxns(cons *Connections, txnsPath string) (int, error) {
 		pos += bytes
 
 		num_added++
+	}
+
+	return num_added, nil
+}
+
+func Client_sendTxnsMT(cons []*Connections, txnsPath string) (int, error) {
+
+	var num_added = 0
+
+	data, err := os.ReadFile(txnsPath)
+	if err != nil {
+		return -1, fmt.Errorf("Client_sendTxns() ReadFile() failed: %w", err)
+	}
+
+	pos := 0
+	for pos < len(data) {
+
+		for _, c := range cons {
+
+			bytes := int(binary.LittleEndian.Uint64(data[pos : pos+8]))
+			pos += 8
+
+			//node.net.txnsPool.Add(data[pos : pos+bytes])
+			err := c.SendTxn(data[pos : pos+bytes])
+			if err != nil {
+				log.Printf("Client_sendTxns() failed: %v\n", err)
+			}
+			pos += bytes
+
+			num_added++
+		}
 
 	}
 

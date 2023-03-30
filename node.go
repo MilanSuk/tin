@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 const BlocksPool_ITEM = 1024 * 1024
@@ -27,9 +28,11 @@ const BlocksPool_ITEM = 1024 * 1024
 type NodeStat struct {
 	start_time float64
 
-	sum_time   float64
+	dtime     float64
+	num_txns  int
+	num_bytes int
+
 	sum_txns   int
-	sum_bytes  int
 	num_blocks int
 }
 
@@ -38,22 +41,21 @@ func (stat *NodeStat) Start() {
 }
 
 func (stat *NodeStat) End(bytes int, num_txns int) {
-	stat.sum_time += OsTime() - stat.start_time
+	stat.dtime = OsTime() - stat.start_time
 
-	stat.num_blocks++
+	stat.num_txns = num_txns
+	stat.num_bytes = bytes
+
 	stat.sum_txns += num_txns
-	stat.sum_bytes += bytes
+	stat.num_blocks++
 }
 
-func (stat *NodeStat) AvgTxnInBlock() int {
-	return OsTrn(stat.num_blocks > 0, stat.sum_txns/stat.num_blocks, 0)
+func (stat *NodeStat) NumTxnInBlock() int {
+	return stat.num_txns
 }
 
-func (stat *NodeStat) AvgBytesInBlock() int {
-	return OsTrn(stat.num_blocks > 0, stat.sum_bytes/stat.num_blocks, 0)
-}
-func (stat *NodeStat) AvgTimeBlock() float64 {
-	return OsTrnFloat(stat.num_blocks > 0, stat.sum_time/float64(stat.num_blocks), 0)
+func (stat *NodeStat) NumBytesInBlock() int {
+	return stat.num_bytes
 }
 
 func (stat *NodeStat) Print(ledger *Ledger) {
@@ -61,9 +63,9 @@ func (stat *NodeStat) Print(ledger *Ledger) {
 	fmt.Printf("Num Accounts: %d\n", len(ledger.accounts.accounts))
 	fmt.Printf("Num blocks: %d\n", stat.num_blocks)
 
-	fmt.Printf("Avg txn in block written: %d\n", stat.AvgTxnInBlock())
-	fmt.Printf("Avg bytes in block written: %.1f%% of 1MB\n", float64(stat.AvgBytesInBlock())/BlocksPool_ITEM*100)
-	fmt.Printf("Avg block time: %.2fsec\n", stat.AvgTimeBlock())
+	fmt.Printf("txn in block written: %d\n", stat.NumTxnInBlock())
+	fmt.Printf("bytes in block written: %.1f%% of 1MB\n", float64(stat.NumBytesInBlock())/BlocksPool_ITEM*100)
+	fmt.Printf("block time: %.2fsec\n", stat.dtime)
 	fmt.Printf("Db file size: %.1fMB\n", float64(OsFileBytes(ledger.dbPath))/1024.0/1024.0)
 	fmt.Printf("Avg db bytes/txn: %.dB\n", OsTrn(stat.sum_txns > 0, int(OsFileBytes(ledger.dbPath))/stat.sum_txns, 0))
 
@@ -148,14 +150,19 @@ func (node *Node) Destroy() {
 
 func (node *Node) CreateBlock() error {
 
-	if node.net.txnsPool.Num() >= node.NUMBER_TXNS_IN_BLOCK { // or timeout ...
+	if node.net.txnsPool.Num() > 0 {
 
 		node.stat.Start()
 		node.ledger.BatchStart()
 
 		// add txns into new block
 		var absErr error
-		for i := 0; i < node.NUMBER_TXNS_IN_BLOCK; i++ {
+
+		for node.blockRaw.NumTxns() < node.NUMBER_TXNS_IN_BLOCK { // or timeout ...
+
+			for node.net.txnsPool.Num() == 0 { // or timeout ...
+				time.Sleep(1 * time.Millisecond)
+			}
 
 			txn, err := node.net.txnsPool.Get()
 			if err != nil {

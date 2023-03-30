@@ -65,30 +65,43 @@ func (txn *TxnRaw) InitTxnRawShort(src_id int64, src_nonce int64, amount int64, 
 	txn.dst_id = dst_id + TxnRaw_ADJUST_DST_ID
 }
 
-func (txn *TxnRaw) InitTxnFromBuffer(buff *TBuffer, needSign bool) ([]byte, *bls.Sign, error) {
+func (txn *TxnRaw) InitTxnFromBuffer(buff *TBuffer, readPubKey bool, needSign bool) ([]byte, *bls.PublicKey, *bls.Sign, error) {
+	var pk bls.PublicKey
+	if readPubKey {
+		pubKey := BLSPubKey{}
+		err := buff.ReadSBlob(pubKey.arr[:], int64(len(pubKey.arr)))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		}
+
+		err = pubKey.Export(&pk)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() PubKey export failed: %w", err)
+		}
+	}
 
 	pos_backup := buff.pos
 
 	var err error
 	txn.src_id, err = buff.ReadNumber()
 	if err != nil {
-		return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 	}
 	txn.src_nonce, err = buff.ReadNumber()
 	if err != nil {
-		return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 	}
 	txn.amount, err = buff.ReadNumber()
 	if err != nil {
-		return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 	}
 	txn.fee, err = buff.ReadNumber()
 	if err != nil {
-		return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 	}
 	txn.dst_type, err = buff.ReadByte()
 	if err != nil {
-		return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 	}
 
 	txn.src_id -= TxnRaw_ADJUST_SRC_ID
@@ -97,12 +110,12 @@ func (txn *TxnRaw) InitTxnFromBuffer(buff *TBuffer, needSign bool) ([]byte, *bls
 	if txn.dst_type == 0 {
 		err := buff.ReadSBlob(txn.dst_pubKey.arr[:], int64(len(txn.dst_pubKey.arr)))
 		if err != nil {
-			return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 		}
 	} else {
 		txn.dst_id, err = buff.ReadNumber()
 		if err != nil {
-			return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 		}
 
 		txn.dst_id -= TxnRaw_ADJUST_DST_ID
@@ -114,36 +127,40 @@ func (txn *TxnRaw) InitTxnFromBuffer(buff *TBuffer, needSign bool) ([]byte, *bls
 		var s BLSSign
 		err := buff.ReadSBlob(s.arr[:], int64(len(s.arr)))
 		if err != nil {
-			return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 		}
 
 		err = s.Export(&sig)
 		if err != nil {
-			return nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
+			return nil, nil, nil, fmt.Errorf("InitTxnFromBuffer() failed: %w", err)
 		}
 	}
 
-	return ret, &sig, nil
+	return ret, &pk, &sig, nil
 }
 
-func (txn *TxnRaw) ExportBuffer(key *bls.SecretKey, buff *TBuffer) error {
+func (txn *TxnRaw) ExportBuffer(pubKey *BLSPubKey, key *bls.SecretKey, buff *TBuffer) error {
 
 	buff.Clear()
-	buff.writeNumber(txn.src_id)
-	buff.writeNumber(txn.src_nonce)
-	buff.writeNumber(txn.amount)
-	buff.writeNumber(txn.fee)
+	if pubKey != nil {
+		buff.WriteSBlob(pubKey.arr[:])
+	}
+
+	buff.WriteNumber(txn.src_id)
+	buff.WriteNumber(txn.src_nonce)
+	buff.WriteNumber(txn.amount)
+	buff.WriteNumber(txn.fee)
 
 	buff.WriteUint8(txn.dst_type)
 
 	if txn.dst_type == 0 {
 		buff.WriteSBlob(txn.dst_pubKey.arr[:])
 	} else {
-		buff.writeNumber(txn.dst_id)
+		buff.WriteNumber(txn.dst_id)
 	}
 
 	{
-		h, err := buff.sha256()
+		h, err := buff.sha256(len(pubKey.arr))
 		if err != nil {
 			return fmt.Errorf("ExportBuffer() failed: %w", err)
 		}
