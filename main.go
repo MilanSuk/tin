@@ -38,8 +38,8 @@ func main() {
 	txnsPath := "data/txns_"
 	blocksPath := "data/blocks.bin"
 
-	const NUMBER_TXNS = 4000
-	const NUMBER_TXNS_IN_BLOCK = 1000
+	const NUMBER_TXNS = 40000
+	const NUMBER_TXNS_IN_BLOCK = 10000
 
 	// inits Db
 	var genesis_amount int64
