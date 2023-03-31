@@ -18,9 +18,9 @@ Light-client(work in progress):
 
 
 ## Performance
-user : 51 sec to generate 40K txns
-miner: 12 sec to create a block with 10K txns(~0.15MB). A full 1MB block can hold ~60K txns
-miner: 5 sec to check block(10K txns)
+- user : 51 sec to generate 40K txns
+- miner: 12 sec to create a block with 10K txns(~0.15MB). A full 1MB block can hold ~60K txns
+- miner: 5 sec to check block(10K txns)
 
 1MB block(60K txns) mined every 10 minutes = 100 txns/sec
 
